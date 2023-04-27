@@ -1,34 +1,17 @@
 #include "rtree.h"
+#include <stdlib.h>
 
-// 
+// declaring typedefs for all struct pointers
+typedef struct point* POINT;
+typedef struct rectangle* RECTANGLE;
+typedef struct index* INDEX;
+typedef struct node* NODE;
+
+// Point
 typedef struct point{
     int x;
     int y;
 } Point;
-typedef Point* POINT;
-
-// 
-typedef struct rectangle{
-    POINT min; // bottom left vertex
-    POINT max; // upper right vertex
-} Rectangle;
-typedef Rectangle* RECTANGLE;
-
-// Index 
-typedef struct index{
-    RECTANGLE rect; // the MBR of all rectangles present in the child node of this index
-    int lhv; // the Largest Hilbert Value among child indices
-    NODE child; // a pointer to the child node of this index
-} Index;
-typedef Index* INDEX;
-
-// 
-typedef struct node{
-    Index* I;
-    int size;
-} Node;
-typedef Node* NODE;
-
 
 // Constructor for Point struct
 POINT newPoint(int x, int y) {
@@ -38,6 +21,12 @@ POINT newPoint(int x, int y) {
     return newPoint;
 }
 
+// Rectangle - min , max should be pointer or change it to simple struct
+typedef struct rectangle{
+    POINT min; // bottom left vertex
+    POINT max; // upper right vertex
+} Rectangle;
+
 // Constructor for Rectangle struct
 RECTANGLE newRectangle(POINT min, POINT max) {
     RECTANGLE newRect = (RECTANGLE) malloc(sizeof(Rectangle));
@@ -45,6 +34,13 @@ RECTANGLE newRectangle(POINT min, POINT max) {
     newRect->max = max;
     return newRect;
 }
+
+// Index 
+typedef struct index{
+    RECTANGLE rect; // the MBR of all rectangles present in the child node of this index
+    int lhv; // the Largest Hilbert Value among child indices
+    NODE child; // a pointer to the child node of this index
+} Index;
 
 // Constructor for Index struct
 INDEX newIndex(RECTANGLE rect, int lhv, NODE child) {
@@ -55,13 +51,16 @@ INDEX newIndex(RECTANGLE rect, int lhv, NODE child) {
     return newIndex;
 }
 
+// Node
+typedef struct node{
+    Index* I[4];
+    int size;
+} Node;
+
 // Constructor for Node struct
 NODE newNode() {
     NODE newNode = (NODE) malloc(sizeof(Node));
-    INDEX i_ptr = (INDEX) malloc(sizeof(Index)*M);
-    // Index I[4];
+    for (int i = 0; i < M; i++) newNode->I[i] = NULL;
     newNode->size = 0;
-    newNode->I = i_ptr;
     return newNode;
 }
-
