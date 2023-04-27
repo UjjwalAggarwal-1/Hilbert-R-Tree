@@ -53,7 +53,7 @@ INDEX newIndex(RECTANGLE rect, int lhv, NODE child) {
 
 // Node
 typedef struct node{
-    Index* I[4];
+    INDEX I[4];
     int size;
 } Node;
 
