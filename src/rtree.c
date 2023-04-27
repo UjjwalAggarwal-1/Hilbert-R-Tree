@@ -1,17 +1,14 @@
 #include "rtree.h"
 #include <stdlib.h>
 
-// declaring typedefs for all struct pointers
-typedef struct point* POINT;
-typedef struct rectangle* RECTANGLE;
-typedef struct index* INDEX;
-typedef struct node* NODE;
 
 // Point
 typedef struct point{
     int x;
     int y;
 } Point;
+
+typedef struct point* POINT;
 
 // Constructor for Point struct
 POINT newPoint(int x, int y) {
@@ -21,11 +18,14 @@ POINT newPoint(int x, int y) {
     return newPoint;
 }
 
+
 // Rectangle - min , max should be pointer or change it to simple struct
 typedef struct rectangle{
     POINT min; // bottom left vertex
     POINT max; // upper right vertex
 } Rectangle;
+
+typedef struct rectangle* RECTANGLE;
 
 // Constructor for Rectangle struct
 RECTANGLE newRectangle(POINT min, POINT max) {
@@ -34,6 +34,28 @@ RECTANGLE newRectangle(POINT min, POINT max) {
     newRect->max = max;
     return newRect;
 }
+
+
+// Index Pointer
+typedef struct index* INDEX;
+
+// Node Pointer
+typedef struct node* NODE;
+
+// Node
+typedef struct node{
+    INDEX I[4];
+    int size;
+} Node;
+
+// Constructor for Node struct
+NODE newNode() {
+    NODE newNode = (NODE) malloc(sizeof(Node));
+    for (int i = 0; i < M; i++) newNode->I[i] = NULL;
+    newNode->size = 0;
+    return newNode;
+}
+
 
 // Index 
 typedef struct index{
@@ -49,18 +71,4 @@ INDEX newIndex(RECTANGLE rect, int lhv, NODE child) {
     newIndex->lhv = lhv;
     newIndex->child = child;
     return newIndex;
-}
-
-// Node
-typedef struct node{
-    INDEX I[4];
-    int size;
-} Node;
-
-// Constructor for Node struct
-NODE newNode() {
-    NODE newNode = (NODE) malloc(sizeof(Node));
-    for (int i = 0; i < M; i++) newNode->I[i] = NULL;
-    newNode->size = 0;
-    return newNode;
 }
