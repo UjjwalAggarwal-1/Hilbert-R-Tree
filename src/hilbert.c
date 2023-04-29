@@ -1,36 +1,115 @@
 #include "hilbert.h"
+#include <stdio.h>
 #include <math.h>
 
-
-// rotate/flip a quadrant appropriately
-void rotate(int n,int *x,int *y, int x0, int y0)
+char newQuadType(char oldType, float quad)
 {
-    if(y0==0)
+    if(oldType=='A')
     {
-        if(x0==1)
-        {
-            *y=n-1-*y;
-            *x=n-1-*x;
-        }
-        //Swap x and y
-        int t=*x;
-        *x=*y;
-        *y=t;
+        if(quad==0) return 'D';
+        if(quad==1) return 'A';
+        if(quad==2) return 'A';
+        if(quad==3) return 'B';
     }
+    if(oldType=='B')
+    {
+        if(quad==0) return 'B';
+        if(quad==1) return 'B';
+        if(quad==2) return 'C';
+        if(quad==3) return 'A';
+    }
+    if(oldType=='C')
+    {
+        if(quad==0) return 'C';
+        if(quad==1) return 'D';
+        if(quad==2) return 'B';
+        if(quad==3) return 'C';
+    }
+    if(oldType=='D')
+    {
+        if(quad==0) return 'A';
+        if(quad==1) return 'C';
+        if(quad==2) return 'D';
+        if(quad==3) return 'D';
+    }
+    return 'A';
 }
 
-// convert (x,y) to d
-int hilbertValue(POINT p)
+float quadValue(char oldType, float quad)
 {
-    int n=pow(2,N);
-    int x=p->x,y=p->y;
-    int x0,y0,s,d=0;
-    for(s=n/2;s>0;s/=2)
+    if(oldType=='A')
     {
-        y0=(y&s)>0;
-        x0=(x&s)>0;
-        d=d+((3*x0)^y0)*s*s;
-        rotate(n,&x,&y,x0,y0);
+        if(quad==0) return 0;
+        if(quad==1) return 1;
+        if(quad==2) return 2;
+        if(quad==3) return 3;
     }
-    return d;
+    if(oldType=='B')
+    {
+        if(quad==0) return 2;
+        if(quad==1) return 1;
+        if(quad==2) return 0;
+        if(quad==3) return 3;
+    }
+    if(oldType=='C')
+    {
+        if(quad==0) return 2;
+        if(quad==1) return 3;
+        if(quad==2) return 0;
+        if(quad==3) return 1;
+    }
+    if(oldType=='D')
+    {
+        if(quad==0) return 0;
+        if(quad==1) return 3;
+        if(quad==2) return 2;
+        if(quad==3) return 1;
+    }
+    return 0;
+}
+
+void hilbert(float n, float x, float y, float* res, char quadType)
+{
+    if(n==1) return;
+    float p=n/2;
+    float quad;
+    if(x<p && y<p)
+    {
+        quad=0;
+    }
+    else if(x<p && y>=p)
+    {
+        quad=1;
+        y-=p;
+    }
+    else if(x>=p && y>=p)
+    {
+        quad=2;
+        x-=p;
+        y-=p;
+    }
+    else
+    {
+        quad=3;
+        x-=p;
+    }
+    float quadVal=quadValue(quadType,quad);
+    *res=((*res)*pow(2, 2))+(quadVal);
+    char newQuad=newQuadType(quadType, quad);
+    hilbert(n/2,x,y,res, newQuad);
+}
+
+float hilbertValue(POINT p)
+{
+    float res=0;
+    hilbert(pow(2, N), p->x, p->y, &res, 'A');
+    return res;
+}
+
+int main(){
+    POINT p = newPoint(1,9);
+    float test = hilbertValue(p);
+    printf("%f\n", test);
+
+    return 0;
 }
