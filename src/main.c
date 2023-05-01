@@ -186,8 +186,8 @@ TREE newTree(){
     return newTree;
 }
 
-NODE ChooseLeaf(NODE root, RECTANGLE r, float h){
-    NODE n = root; // start with the root node
+NODE ChooseLeaf(NODE n, RECTANGLE r, float h){
+    //n is the root node at which to start
     if(isLeaf(n)){
         return n;
     }
@@ -199,14 +199,9 @@ NODE ChooseLeaf(NODE root, RECTANGLE r, float h){
     return ChooseLeaf(n->I[n->size-1]->child, r, h); // 
 }
 
-void AdjustTree(NODE arr[]){
-
-}
-
-NODE HandleOverflow(NODE root, NODE n, INDEX ind){
-    // get the parent node of n and set its sibling node as NULL. We will check for siblings later
-    NODE parent = n->parent, sibling=NULL; 
-    
+NODE GetCooperatingSibling(NODE n){
+    NODE parent = n->parent;
+    NODE sibling = NULL;
     // n can only have siblings if its parent exists and has a size of at least 2
     if(parent && (parent->size > 1)){ 
         int i=0; 
@@ -219,6 +214,14 @@ NODE HandleOverflow(NODE root, NODE n, INDEX ind){
             else sibling = parent->I[i+1]->child; // in case left is full, we take the right one regardless it is full or not
         }
     }
+    return sibling;
+}
+
+NODE HandleOverflow(TREE t, NODE n, INDEX ind){
+    NODE root = t->root;
+
+    // get the sibling node 
+    NODE sibling = GetCooperatingSibling(n);
     // now we calculate the size of the set of indices 
     // present in n, its sibling and the new index
     int setSize = n->size + 1; 
@@ -259,7 +262,6 @@ NODE HandleOverflow(NODE root, NODE n, INDEX ind){
     
     // now we have our sorted set of rectangles.
     // Now, if there is space in the sibling, distribute all rectangles evenly in both
-
     if(sibling && sibling->size < M){ // now total elements can be adjusted in the two siblings
         int k = setSize/2;
         
@@ -350,7 +352,99 @@ NODE HandleOverflow(NODE root, NODE n, INDEX ind){
     }
 }
 
-void Insert(NODE root, RECTANGLE r){
+INDEX MBR(NODE n){
+    POINT min, max;
+    float lhv = n->I[0]->lhv;
+    
+    min->x = n->I[0]->rect->min->x;
+    min->y = n->I[0]->rect->min->y;
+    max->x = n->I[0]->rect->max->x;
+    max->y = n->I[0]->rect->max->y;
+
+    // calculate the min and max points and lhv of the MBR of n
+    for(int i = 1; i < n->size; i++){
+        if(n->I[i]->rect->min->x < min->x)
+            min->x = n->I[i]->rect->min->x; // x value for min will be the minimum x for all rectangles in n
+        if(n->I[i]->rect->min->y < min->y)
+            min->y = n->I[i]->rect->min->y; // y value for min will be the minimum y for all rectangles in n
+        if(n->I[i]->rect->max->x > max->x)
+            max->x = n->I[i]->rect->max->x; // x value for max will be the maximum x for all rectangles in n
+        if(n->I[i]->rect->max->y > max->y)
+            max->y = n->I[i]->rect->max->y; // y value for max will be the maximum y for all rectangles in n
+        if(n->I[i]->lhv > lhv)
+            lhv = n->I[i]->lhv;             // lhv will be the maximum lhv for all rectangles in n
+    }
+
+    RECTANGLE mbr = newRectangle(min, max); // creating the MBR
+    INDEX ind = newIndex(mbr, lhv, n); // creating the index that stores the MBR
+
+    return ind;
+}
+
+NODE AdjustTree(TREE t, NODE arr[]){
+    NODE root = t->root;
+    /*
+        arr[0] -> node being updated
+        arr[1] -> sibling node, if any (can be NULL)
+        arr[2] -> new node created during split, if any (can be NULL)
+    */
+    if(!arr[0]->parent) return arr[2]; // if reached root level, stop and return the new node if root was split
+    NODE Np = arr[0]->parent;
+
+    NODE parents[3]; 
+    // parents is  an array that contains the parent node 
+    // of the node being updated, its cooperating sibling,
+    // if any, and the new node that might be formed when 
+    // we try to insert into the parent node
+    parents[0] = Np;
+    parents[1] = GetCooperatingSibling(Np);
+    parents[2] = NULL;
+    
+    // if there was a split when trying to insert into 
+    // the node, we try to insert the MBR of the newly
+    // created node into the parent node Np
+    if(arr[2]){
+        INDEX NN = MBR(arr[2]);
+        
+        if(Np->size < M){ // if there is space in Np, we insert
+            for(int i = Np->size++ ; i >= 0; i--){
+                if(Np->I[i]->lhv > NN->lhv)
+                    Np->I[i+1] = Np->I[i];
+                else{
+                    Np->I[i] = NN;
+                    break;
+                } 
+            }
+        }
+        else{ // otherwise, call HandleOverflow
+            parents[2] = HandleOverflow(t, Np, NN);
+        }
+    }
+
+    for(int i = Np->size - 1 ; i >= 0; i--){  // fix the MBRs present in the parent node
+        Np->I[i] = MBR(Np->I[i]->child);
+    }
+
+    return AdjustTree(t, parents);
+}
+
+void JoinRoot(TREE t, NODE left){
+    NODE root = t->root; 
+    NODE new = newNode();
+    if(root->I[root->size - 1]->lhv < left->I[left->size - 1]->lhv){
+        new->I[new->size++] = root;
+        new->I[new->size++] = left;
+    }
+    else{
+        new->I[new->size++] = left;
+        new->I[new->size++] = root;
+    }
+    t->root = new;
+}
+
+void Insert(TREE t, RECTANGLE r){
+    NODE root = t->root;
+    
     // calculating the center point of the rectangle
     float xmid=(r->min->x+r->max->x)/2.0;
     float ymid=(r->min->x+r->max->y)/2.0;
@@ -361,6 +455,11 @@ void Insert(NODE root, RECTANGLE r){
     // this selects the leaf node in which to place our rectangle
     NODE leaf = ChooseLeaf(root, r, hilbertValue(pmid)); 
     
+    NODE arr[3];
+    arr[0] = leaf;
+    arr[1] = GetCooperatingSibling(leaf);
+    arr[2] = NULL;
+
     if(leaf->size<M){ // if there is space in this node, insert the rectangle
         for(int i=leaf->size-1; i>=0; i--){
             if(leaf->I[i]->lhv > ind->lhv) leaf->I[i+1] = leaf->I[i];    // inserting the rectangle in the
@@ -370,20 +469,20 @@ void Insert(NODE root, RECTANGLE r){
             }                                                            // insertion sort algorithm 
         }
     }
-    else{ // else, call the HandleOverflow method
-        NODE node = HandleOverflow(root, leaf, ind);
-        if(node){
-            
-        }
-    }
-    
+    else              // else, call the HandleOverflow method
+        arr[2] = HandleOverflow(t, leaf, ind);
+    NODE Left = AdjustTree(t, arr);
+    if(Left)
+        JoinRoot(t, Left);
 }
 
 int checkIntersection(RECTANGLE r1, RECTANGLE r2){
     return (r2->min->x <= r1->max->x) && (r2->max->x >= r1->min->x) && (r2->min->y <= r1->max->y) && (r2->max->y >= r1->min->y);
 }
 
-void Search(NODE root,RECTANGLE r){
+void Search(TREE t,RECTANGLE r){
+    NODE root = t->root;
+    
     for(int i=0; i<root->size; i++){
         if(checkIntersection(root->I[i]->rect, r)){
             if(isLeaf(root)){
