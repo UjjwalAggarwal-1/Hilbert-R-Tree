@@ -26,6 +26,7 @@ typedef struct node* NODE;
 
 // Node
 typedef struct node{
+    NODE parent;
     INDEX I[M];
     int size;
 } Node;
@@ -174,6 +175,7 @@ NODE newNode(){
     NODE newNode = (NODE) malloc(sizeof(Node));
     for (int i = 0; i < M; i++) newNode->I[i] = NULL;
     newNode->size = 0;
+    newNode->parent = NULL;
     return newNode;
 }
 
@@ -185,40 +187,195 @@ TREE newTree(){
 }
 
 NODE ChooseLeaf(NODE root, RECTANGLE r, float h){
-    NODE n = root;
-    if(isLeaf(n))
+    NODE n = root; // start with the root node
+    if(isLeaf(n)){
         return n;
-    
+    }
     for(int i=0; i<n->size; i++){
         if(n->I[i]->lhv > h){
             return ChooseLeaf(n->I[i]->child, r, h);
         }
     }
+    return ChooseLeaf(n->I[n->size-1]->child, r, h); // 
+}
+
+void AdjustTree(NODE arr[]){
+
+}
+
+NODE HandleOverflow(NODE root, NODE n, INDEX ind){
+    // get the parent node of n and set its sibling node as NULL. We will check for siblings later
+    NODE parent = n->parent, sibling=NULL; 
+    
+    // n can only have siblings if its parent exists and has a size of at least 2
+    if(parent && (parent->size > 1)){ 
+        int i=0; 
+        while(parent->I[i]->child != n) i++; // get the index of the MBR of n in its parent
+
+        if(i==0) sibling = parent->I[i+1]->child; // if it is the first in line, we take the node to its right
+        else if(i==parent->size-1) sibling = parent->I[i-1]->child; // if it is the last in line, we take the immediate left
+        else{ // otherwise we check for both left and right siblings
+            if(parent->I[i-1]->child->size < M) sibling = parent->I[i-1]->child; // incase the left sibling is not full
+            else sibling = parent->I[i+1]->child; // in case left is full, we take the right one regardless it is full or not
+        }
+    }
+    // now we calculate the size of the set of indices 
+    // present in n, its sibling and the new index
+    int setSize = n->size + 1; 
+    if(sibling) setSize += sibling->size;
+
+    INDEX set[setSize];
+    // add indices of n and sibling in sorted order
+    int j = 0;
+
+    if(sibling){
+        if(n->I[0]->lhv < sibling->I[0]->lhv){    // if indices in n are smaller, append them first
+            for(int i = 0; i<n->size; i++)
+                set[j++] = n->I[i];
+            for(int i = 0; i<sibling->size; i++)
+                set[j++] = sibling->I[i];
+        }
+        else{                                     // otherwise, append the indices of the sibling first
+            for(int i = 0; i<sibling->size; i++)
+                set[j++] = sibling->I[i];
+            for(int i = 0; i<n->size; i++)
+                set[j++] = n->I[i];
+        }
+    }
+    else{
+        for(int i = 0; i<n->size; i++)           // if there is no sibling, just append the indices of n
+                set[j++] = n->I[i];
+    }
+    // insert the new rectangle in sorted order
+    for(int i = 0; i<setSize; i++){
+        if (set[i]> ind){
+            j = i;            // got the index
+            break;
+        }
+    }
+    for (int i = setSize-2; i>=j; i--) //last index of set array is setSize-1
+        set[i+1] = set[i];    // shift the elements(rectangles)
+    set[j] = ind;             // insert the new rectangle
+    
+    // now we have our sorted set of rectangles.
+    // Now, if there is space in the sibling, distribute all rectangles evenly in both
+
+    if(sibling && sibling->size < M){ // now total elements can be adjusted in the two siblings
+        int k = setSize/2;
+        
+        if(n->I[0]->lhv < sibling->I[0]->lhv){ // sibling is greater in terms of Hilbert Value
+            int i1 = 0, i2 = 0, i3 = 0;
+            while(i1 < k) 
+                n->I[i1++] = set[i2++];  // set the node first
+            while(i1 < n->size)
+                n->I[i1++] = NULL;
+            while(i2 < setSize)    // then set the sibling
+                sibling->I[i3++] = set[i2++];
+            while(i3 < sibling->size)
+                sibling->I[i3++] = NULL;
+            n->size = k; 
+            sibling->size = setSize - k;
+        }
+        else{
+            int i1 = 0, i2 = 0, i3 = 0;
+            while(i3 < k)
+                sibling->I[i3++] = set[i2++];  // set the sibling first
+            while(i3 < sibling->size)
+                sibling->I[i3++] = NULL;
+            while(i2 < setSize)
+                n->I[i1++] = set[i2++];     // then set the node 
+            while(i1<n->size)
+                n->I[i1++] = NULL;
+            sibling->size = k;
+            n->size = setSize - k;
+        }
+
+        return NULL;
+    }
+    else if(sibling){ // if sibling is present and it is full then we will distribute all indeices in 3 nodes
+        NODE NN = newNode(); // new node
+        int k = setSize/3;
+        if(n->I[0]->lhv < sibling->I[0]->lhv){ // so sibling was on right 
+            for(int i = 0; i < n->size; i++) // removing all indices from n
+                n->I[i] = NULL;
+            for(int i = 0; i < sibling->size; i++) // removing all indices from siblings
+                sibling->I[i] = NULL;
+            int j = 0;
+            for(int i = 0; i < k ; i++) // putting first k indices in n (lowest) 
+                n->I[i] = set[j++];
+            for(int i = 0; i < k ; i++) // putting next k indices in siblings
+                sibling->I[i] = set[j++];
+            for(int i = 0; i < setSize - 2*k; i++) // putting next k in new n
+                NN->I[i] = set[j++];
+        }
+        else{
+            for(int i = 0; i < n->size; i++) // removing all indices from n
+                n->I[i] = NULL;
+            for(int i = 0; i < sibling->size; i++) // removing all indices from siblings
+                sibling->I[i] = NULL;
+            int j = 0;
+            for(int i = 0; i < k ; i++) // putting next k indices in siblings (lowest)
+                sibling->I[i] = set[j++];
+            for(int i = 0; i < k ; i++)// putting first k indices in n
+                n->I[i] = set[j++];
+            for(int i = 0; i < setSize - 2*k ; i++) // putting next k in new n
+                NN->I[i] = set[j++];
+        }
+        // updating all the sizes
+        n->size = k;
+        sibling->size=k;
+        NN->size=setSize - 2*k;
+        
+        return NN;    
+    }
+    else{ // when there is no sibling. This case should only arise when n is the root node
+        NODE NN = newNode(); // create a new node to distribute indices evenly
+        int k = setSize/2;   // k is the number of indices we will put in n, the original node
+        
+        for(int i = 0; i < n->size; i++) 
+            n->I[i] = NULL;              // make all indices in n NULL
+        n->size = 0;
+        
+        int j = 0;
+        for(int i = 0; i < k; i++){
+            n->I[i] = set[j++];     // add the first k indices of the set to n
+            n->size++;
+        }
+        for(int i = 0; i < setSize - k; i++){
+            NN->I[i] = set[j++];           // add the rest of them to new node NN
+            NN->size++;
+        }
+        
+        return NN;
+    }
 }
 
 void Insert(NODE root, RECTANGLE r){
+    // calculating the center point of the rectangle
     float xmid=(r->min->x+r->max->x)/2.0;
     float ymid=(r->min->x+r->max->y)/2.0;
+    POINT pmid=newPoint(xmid, ymid); // creating a point with those coordinates
 
-    POINT pmid=newPoint(xmid, ymid);
-    NODE leaf = ChooseLeaf(root, r, hilbertValue(pmid));
-    INDEX rect = newIndex(r, hilbertValue(pmid), NULL);
+    INDEX ind = newIndex(r, hilbertValue(pmid), NULL); // creating an index record having the given rectangle
     
-    if(leaf->size<M)
-    {
-        for(int i=leaf->size-1; i>=0; i--)
-        {
-            if(leaf->I[i]->lhv>rect->lhv) leaf->I[i+1] = leaf->I[i];
-            else leaf->I[i]=rect;
+    // this selects the leaf node in which to place our rectangle
+    NODE leaf = ChooseLeaf(root, r, hilbertValue(pmid)); 
+    
+    if(leaf->size<M){ // if there is space in this node, insert the rectangle
+        for(int i=leaf->size-1; i>=0; i--){
+            if(leaf->I[i]->lhv > ind->lhv) leaf->I[i+1] = leaf->I[i];    // inserting the rectangle in the
+            else{                                                        // node in a sorted order based on
+                leaf->I[i+1]=ind;                                        // the hilbert values of all the 
+                break;                                                   // rectangles, akin to the
+            }                                                            // insertion sort algorithm 
         }
     }
-    else
-    {
-        
+    else{ // else, call the HandleOverflow method
+        NODE node = HandleOverflow(root, leaf, ind);
+        if(node){
+            
+        }
     }
-}
-
-void HandleOverflow(NODE root, NODE n, RECTANGLE r){
     
 }
 
@@ -241,14 +398,7 @@ void Search(NODE root,RECTANGLE r){
     return;
 }
 
-
-
-
-// main.c 
-
-
-int main()
-{
+int main(){
     POINT p = newPoint(2,10);
     float test = hilbertValue(p);
     printf("%f\n", test);
