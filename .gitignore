@@ -54,3 +54,4 @@ dkms.conf
 # extra 
 .vscode
 src/hilbert_exe
+.DS_Store
